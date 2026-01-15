@@ -7,10 +7,13 @@ export const Camera = {
     stream: null,
     active: false,
 
-    async init(videoElementId = null) {
+    async init(videoElementId) {
         if (this.active) return this.video;
 
         try {
+            this.video = document.getElementById(videoElementId);
+            if (!this.video) throw new Error("Elemento de vídeo não encontrado.");
+
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     width: { ideal: 640 },
@@ -20,21 +23,16 @@ export const Camera = {
                 audio: false
             });
 
-            if (videoElementId) {
-                this.video = document.getElementById(videoElementId);
-            } else {
-                this.video = document.createElement('video');
-            }
-
             this.video.srcObject = this.stream;
-            this.video.setAttribute('playsinline', ''); // Necessário para iOS
+            this.video.setAttribute('playsinline', ''); 
             await this.video.play();
             
             this.active = true;
-            console.log("📷 Câmera inicializada com sucesso.");
+            console.log("📷 Câmera inicializada.");
             return this.video;
         } catch (err) {
-            console.error("❌ Erro ao acessar a câmera:", err);
+            console.error("❌ Erro de Câmera:", err);
+            alert("Por favor, permita o acesso à câmera para jogar.");
             throw err;
         }
     },
