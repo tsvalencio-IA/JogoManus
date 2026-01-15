@@ -5,90 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AR RUN - thIAguinho Arcade</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        #video-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
-        #video-feed { width: 100%; height: 100%; object-fit: cover; opacity: 0.4; transform: scaleX(-1); }
-        #game-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
-        #ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); color: #ff00ff; font-size: 32px; text-shadow: 0 0 10px #000; text-align: center; }
-        .back-btn { position: fixed; bottom: 20px; left: 20px; padding: 10px 20px; background: #00f3ff; color: black; text-decoration: none; border-radius: 5px; font-weight: bold; }
+        #ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); color: #ff00ff; font-size: 32px; text-shadow: 0 0 10px #000; text-align: center; z-index: 100; }
+        .back-btn { position: fixed; bottom: 20px; left: 20px; padding: 10px 20px; background: #00f3ff; color: black; text-decoration: none; border-radius: 5px; z-index: 100; font-weight: bold; }
+        #video-feed { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.4; transform: scaleX(-1); z-index: -1; }
     </style>
 </head>
 <body>
-    <div id="video-container">
-        <video id="video-feed" autoplay playsinline></video>
-    </div>
+    <video id="video-feed" autoplay playsinline></video>
     <canvas id="game-canvas"></canvas>
     <div id="ui">DISTÂNCIA: <span id="dist">0</span>m<br><small>CORRA NO LUGAR!</small></div>
-    <a href="index.html" class="back-btn">VOLTAR</a>
+    <a href="index.html" class="back-btn">VOLTAR AO MENU</a>
 
     <script type="module">
-        import { Camera } from './js/modules/camera.js';
-        import { IA } from './js/modules/ia.js';
-
-        let scene, camera, renderer, runner, floor;
-        let distance = 0;
-        let lastFrameData = null;
-        let velocity = 0;
-
-        async function init() {
-            await Camera.init('video-feed');
-            
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-
-            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-            
-            // Runner (Avatar simples)
-            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.5), new THREE.MeshPhongMaterial({ color: 0xff00ff }));
-            runner = new THREE.Group();
-            runner.add(body);
-            body.position.y = 0.75;
-            scene.add(runner);
-
-            // Chão infinito (grid)
-            const grid = new THREE.GridHelper(100, 50, 0x00f3ff, 0x222222);
-            floor = grid;
-            scene.add(floor);
-
-            camera.position.set(0, 2, 5);
-            camera.lookAt(0, 1, 0);
-
-            animate();
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-
-            if (Camera.active) {
-                const analysis = IA.analyzeMotion(Camera.video, lastFrameData);
-                lastFrameData = analysis.frameData;
-
-                // A intensidade do movimento corporal vira velocidade
-                let targetVelocity = analysis.intensity * 0.5;
-                velocity += (targetVelocity - velocity) * 0.1; // Suavização
-            }
-
-            // Progresso
-            distance += velocity * 0.1;
-            floor.position.z = (distance % 2); // Efeito de movimento no grid
-            
-            // Animação de "pulo" do avatar baseada na velocidade
-            runner.position.y = Math.abs(Math.sin(Date.now() * 0.01 * velocity)) * 0.2;
-
-            document.getElementById('dist').innerText = Math.floor(distance);
-            renderer.render(scene, camera);
-        }
-
+        import { ARRun } from './js/games/run.js';
+        window.addEventListener('load', () => ARRun.init());
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            if (ARRun.camera) {
+                ARRun.camera.aspect = window.innerWidth / window.innerHeight;
+                ARRun.camera.updateProjectionMatrix();
+                ARRun.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
         });
-
-        init();
     </script>
 </body>
 </html>
