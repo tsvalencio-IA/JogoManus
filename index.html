@@ -1,188 +1,30 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>MOTION ARCADE – AR KINECT TRILOGY</title>
-
-<!-- TensorFlow -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
-
-<script src="https://cdn.tailwindcss.com"></script>
-
-<style>
-body{margin:0;overflow:hidden;background:#000;font-family:sans-serif}
-#webcam{position:absolute;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:brightness(.6)}
-canvas{position:absolute;top:0;left:0}
-#damage-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:red;opacity:0;pointer-events:none;transition:.1s}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AR Games Trilogy</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
-
-<video id="video-source" playsinline style="display:none"></video>
-<video id="webcam" autoplay muted playsinline></video>
-<canvas id="game-canvas"></canvas>
-<div id="damage-overlay"></div>
-
-<script>
-/* ===================== MOTION ENGINE ===================== */
-class MotionEngine{
-constructor(){
-this.video=document.getElementById("video-source");
-this.detector=null;
-this.pose=null;
-}
-async init(){
-await tf.setBackend("webgl");
-const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:640,height:480}});
-this.video.srcObject=stream;
-document.getElementById("webcam").srcObject=stream;
-await new Promise(r=>this.video.onloadedmetadata=r);
-this.video.play();
-this.detector=await poseDetection.createDetector(
-poseDetection.SupportedModels.MoveNet,
-{modelType:"SinglePose.Lightning"}
-);
-this.loop();
-}
-async loop(){
-const poses=await this.detector.estimatePoses(this.video);
-this.pose=poses[0]||null;
-requestAnimationFrame(()=>this.loop());
-}
-get(){
-if(!this.pose)return null;
-const k=n=>this.pose.keypoints.find(p=>p.name===n);
-return{
-nose:k("nose"),
-lw:k("left_wrist"),
-rw:k("right_wrist"),
-ls:k("left_shoulder"),
-rs:k("right_shoulder")
-};
-}
-}
-
-/* ===================== GAME 1 – DRIVE ===================== */
-class GameDrive{
-constructor(c){this.c=c;this.ctx=c.getContext("2d");this.x=0;this.speed=0}
-start(){this.x=0;this.speed=0}
-update(m){
-if(m&&m.lw.score>.4&&m.rw.score>.4){
-const dy=m.rw.y-m.lw.y;
-this.x+=dy*0.002;
-this.speed=Math.min(this.speed+1,80);
-}else this.speed*=.95;
-
-this.draw();
-return Math.floor(this.speed*10);
-}
-draw(){
-const w=this.c.width,h=this.c.height;
-this.ctx.clearRect(0,0,w,h);
-this.ctx.fillStyle="#333";
-this.ctx.fillRect(0,h*.5,w,h*.5);
-this.ctx.fillStyle="cyan";
-this.ctx.beginPath();
-this.ctx.arc(w/2,h-100,60,0,Math.PI*2);
-this.ctx.stroke();
-this.ctx.save();
-this.ctx.translate(w/2,h-100);
-this.ctx.rotate(this.x);
-this.ctx.fillRect(-50,-5,100,10);
-this.ctx.restore();
-this.ctx.fillStyle="red";
-this.ctx.fillRect(w/2+this.x*200-20,h-80,40,60);
-}
-}
-
-/* ===================== GAME 2 – RUN ===================== */
-class GameRun{
-constructor(c){this.c=c;this.ctx=c.getContext("2d");this.speed=0;this.lastY=null;this.lane=0}
-start(){this.speed=0;this.lastY=null}
-update(m){
-if(m){
-if(this.lastY!==null){
-const dy=Math.abs(m.nose.y-this.lastY);
-this.speed=Math.min(this.speed+dy*0.5,40);
-}
-this.lastY=m.nose.y;
-const center=(m.ls.x+m.rs.x)/2;
-this.lane=center<300?-1:center>340?1:0;
-}
-this.speed*=.95;
-this.draw();
-return Math.floor(this.speed*10);
-}
-draw(){
-const w=this.c.width,h=this.c.height;
-this.ctx.clearRect(0,0,w,h);
-this.ctx.fillStyle="#020";
-this.ctx.fillRect(0,0,w,h);
-this.ctx.strokeStyle="#0f0";
-this.ctx.beginPath();
-this.ctx.moveTo(w/2,h*.5);
-this.ctx.lineTo(w/2+this.lane*100,h);
-this.ctx.stroke();
-}
-}
-
-/* ===================== GAME 3 – BOXING ===================== */
-class GameDance{
-constructor(c){
-this.c=c;this.ctx=c.getContext("2d");
-this.life=100;this.score=0;
-this.last={l:null,r:null};this.t=performance.now();
-}
-start(){this.life=100;this.score=0}
-update(m){
-const now=performance.now(),dt=(now-this.t)/1000;this.t=now;
-if(m){
-["l","r"].forEach(s=>{
-const h=s==="l"?m.lw:m.rw;
-const p=this.last[s];
-if(h&&p){
-const v=Math.hypot(h.x-p.x,h.y-p.y)/dt;
-if(v>150){
-this.life-=10;
-this.score+=100;
-document.getElementById("damage-overlay").style.opacity=.4;
-setTimeout(()=>damageOverlay.style.opacity=0,80);
-}
-}
-this.last[s]=h?{x:h.x,y:h.y}:null;
-});
-}
-this.draw();
-return this.score;
-}
-draw(){
-const w=this.c.width,h=this.c.height;
-this.ctx.clearRect(0,0,w,h);
-this.ctx.fillStyle="rgba(255,0,0,.6)";
-this.ctx.fillRect(w/2-50,50,100,200);
-this.ctx.fillStyle="#fff";
-this.ctx.fillRect(20,20,(w-40)*(this.life/100),10);
-}
-}
-
-/* ===================== SYSTEM ===================== */
-const canvas=document.getElementById("game-canvas");
-canvas.width=innerWidth;canvas.height=innerHeight;
-const motion=new MotionEngine();
-let game=new GameDrive(canvas);
-
-window.onload=async()=>{
-await motion.init();
-setInterval(()=>{
-const m=motion.get();
-const score=game.update(m);
-},16);
-};
-</script>
+  <header>
+    <h1>AR Games Trilogy</h1>
+  </header>
+  <main>
+    <div class="game-grid">
+      <a href="games/ar-drive.html" class="game-card">
+        <h2>AR Drive</h2>
+        <p>Controle seu carro com os braços!</p>
+      </a>
+      <a href="games/ar-run.html" class="game-card">
+        <h2>AR Run</h2>
+        <p>Corra no lugar e veja o mundo avançar!</p>
+      </a>
+      <a href="games/ar-dance-mirror.html" class="game-card">
+        <h2>AR Dance Mirror</h2>
+        <p>Dance e receba feedback em tempo real!</p>
+      </a>
+    </div>
+  </main>
 </body>
 </html>
